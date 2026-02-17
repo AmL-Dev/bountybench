@@ -1,5 +1,6 @@
 import atexit
 import os
+import platform
 import sys
 import time
 from contextlib import contextmanager
@@ -13,7 +14,7 @@ from docker.models.containers import Container
 from messages.action_messages.action_message import ActionMessage
 from messages.action_messages.command_message import CommandMessage
 from resources.base_resource import BaseResourceConfig
-from resources.kali_env_resource_util import KaliEnvResourceUtil
+from resources.kali_env_resource_util import DockerContainerStartError, KaliEnvResourceUtil
 from resources.runnable_base_resource import RunnableBaseResource
 from resources.utils import get_stdout_text
 from utils.git_utils import git_commit
@@ -24,6 +25,11 @@ from utils.progress_logger import start_progress, stop_progress
 DOCKER_IMAGE: str = "cybench/bountyagent:latest"
 ENTRYPOINT: str = "/usr/local/bin/entrypoint.sh"
 DOCKER_CLIENT_INIT_TIMEOUT: int = 300
+# On x86_64, request linux/amd64 so we don't pull/run the published arm64 image by mistake.
+# Override with BOUNTYBENCH_DOCKER_PLATFORM (e.g. linux/amd64 or unset to use host default on Mac).
+DOCKER_PLATFORM: Optional[str] = os.environ.get("BOUNTYBENCH_DOCKER_PLATFORM") or (
+    "linux/amd64" if platform.machine() == "x86_64" else None
+)
 
 TIMEOUT_PER_COMMAND: int = 600
 MAX_RETRIES: int = 3
@@ -370,30 +376,79 @@ class KaliEnvResource(RunnableBaseResource):
             f"Starting a new Docker container (Attempt {attempt + 1}/{MAX_RETRIES})..."
         )
         try:
-            # Pull the latest image before starting the container
-            logger.debug(f"Pulling the latest Docker image: {DOCKER_IMAGE}")
-            try:
-                self.client.images.pull(DOCKER_IMAGE)
-                logger.debug(f"Successfully pulled the latest image: {DOCKER_IMAGE}")
-            except Exception as e:
-                logger.warning(
-                    f"Failed to pull the latest image: {e}. Will use existing image if available."
+            # On x86_64 we skip pull: the registry only has arm64, so pulling would overwrite
+            # a locally built amd64 image. Use local image only when platform is linux/amd64.
+            if DOCKER_PLATFORM != "linux/amd64":
+                pull_kwargs: Dict[str, str] = {}
+                if DOCKER_PLATFORM:
+                    pull_kwargs["platform"] = DOCKER_PLATFORM
+                logger.debug(f"Pulling the latest Docker image: {DOCKER_IMAGE}" + (f" (platform: {DOCKER_PLATFORM})" if DOCKER_PLATFORM else ""))
+                try:
+                    self.client.images.pull(DOCKER_IMAGE, **pull_kwargs)
+                    logger.debug(f"Successfully pulled the latest image: {DOCKER_IMAGE}")
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to pull the latest image: {e}. Will use existing image if available."
+                    )
+            else:
+                logger.debug(
+                    f"Skipping pull on x86_64 to use local image only (registry has arm64 only). "
+                    f"Using {DOCKER_IMAGE} if present."
                 )
+
+            # On x86_64, check local image architecture so we can give a clear error if it's arm64
+            if DOCKER_PLATFORM == "linux/amd64":
+                try:
+                    local_img = self.client.images.get(DOCKER_IMAGE)
+                    arch = local_img.attrs.get("Architecture") or local_img.attrs.get("Os", "unknown")
+                    if arch == "arm64":
+                        raise DockerContainerStartError(
+                            f"Your local {DOCKER_IMAGE} image is ARM64, but this machine is x86_64.\n\n"
+                            "Likely causes:\n"
+                            "1. Docker context: the build ran in a different Docker daemon (e.g. WSL vs Docker Desktop, or a remote/ARM machine). "
+                            "Run 'docker context show' and 'docker images' in the same terminal where you run the workflow; build there with the three docker build commands.\n"
+                            "2. The image was overwritten by a previous pull (we now skip pull on x86_64).\n\n"
+                            "Fix: in the same environment where you run the workflow, run from bountybench/:\n"
+                            "  docker build --platform linux/amd64 -t cybench/kali-linux-base:latest -f tools/dockerhub/Dockerfile.kali_linux_base .\n"
+                            "  docker build --platform linux/amd64 -t cybench/kali-linux-large:latest -f tools/dockerhub/Dockerfile.kali_linux_large .\n"
+                            "  docker build --platform linux/amd64 -t cybench/bountyagent:latest -f Dockerfile .\n"
+                            "Then: docker image inspect cybench/bountyagent:latest --format '{{.Architecture}}'  (should print amd64)."
+                        )
+                except docker.errors.ImageNotFound:
+                    pass  # no local image, run will fail with ImageNotFound
+                except DockerContainerStartError:
+                    raise
 
             print(self.client.containers)
             print("in start")
             print("-" * 90)
-            container = self.client.containers.run(
-                image=DOCKER_IMAGE,
-                cgroupns="host",
-                network="shared_net",
-                volumes=volumes,
-                entrypoint=ENTRYPOINT,
-                privileged=True,
-                detach=True,
-                name=name,
-                command=["tail", "-f", "/dev/null"],
-            )
+            run_kwargs: Dict[str, object] = {
+                "image": DOCKER_IMAGE,
+                "cgroupns": "host",
+                "network": "shared_net",
+                "volumes": volumes,
+                "entrypoint": ENTRYPOINT,
+                "privileged": True,
+                "detach": True,
+                "name": name,
+                "command": ["tail", "-f", "/dev/null"],
+            }
+            if DOCKER_PLATFORM:
+                run_kwargs["platform"] = DOCKER_PLATFORM
+            try:
+                container = self.client.containers.run(**run_kwargs)
+            except (docker.errors.NotFound, docker.errors.APIError) as e:
+                err_msg = str(e)
+                if "does not provide the specified platform (linux/amd64)" in err_msg:
+                    raise DockerContainerStartError(
+                        "The cybench/bountyagent:latest image is ARM64 (Docker Hub or a previous pull overwrote your local build). "
+                        "On x86_64 you must have an amd64 image. From the bountybench directory run:\n"
+                        "  docker build --platform linux/amd64 -t cybench/kali-linux-base:latest -f tools/dockerhub/Dockerfile.kali_linux_base .\n"
+                        "  docker build --platform linux/amd64 -t cybench/kali-linux-large:latest -f tools/dockerhub/Dockerfile.kali_linux_large .\n"
+                        "  docker build --platform linux/amd64 -t cybench/bountyagent:latest -f Dockerfile .\n"
+                        "Pulling is now skipped on x86_64 so your local amd64 image will not be overwritten. See README.md 'Docker image architecture'."
+                    ) from e
+                raise
             self.util.safe_execute(
                 lambda: self.util.print_docker_log(container), "printing docker log"
             )
@@ -518,6 +573,12 @@ class KaliEnvResource(RunnableBaseResource):
 
         for target_host in target_hosts:
             all_hosts += target_host.split()
+
+        # Skip connectivity check when no hosts are specified (e.g. static analysis tasks)
+        all_hosts = [h for h in all_hosts if h.strip()]
+        if not all_hosts:
+            logger.debug("No target hosts to check. Skipping connectivity check.")
+            return
 
         failed_hosts = []
 

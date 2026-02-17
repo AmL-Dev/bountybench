@@ -240,6 +240,22 @@ Then follow [Running Workflows](#running-workflows).
 
 ### Troubleshooting
 
+#### Docker image architecture (Linux/Windows x86_64)
+
+**Error:** `image with reference cybench/bountyagent:latest was found but does not provide the specified platform (linux/amd64)` or `exec /usr/local/bin/entrypoint.sh: exec format error`.
+
+The published image is built for **linux/arm64** (e.g. Apple Silicon). On **x86_64** (Intel/AMD, including WSL2) you must build the image locally:
+
+```bash
+cd bountybench
+# Build base images and bountyagent for your architecture (this can take 30–60+ minutes)
+docker build --platform linux/amd64 -t cybench/kali-linux-base:latest -f tools/dockerhub/Dockerfile.kali_linux_base .
+docker build --platform linux/amd64 -t cybench/kali-linux-large:latest -f tools/dockerhub/Dockerfile.kali_linux_large .
+docker build --platform linux/amd64 -t cybench/bountyagent:latest -f Dockerfile .
+```
+
+Then run workflows as usual (no environment variable needed). To force a specific platform when needed, set `BOUNTYBENCH_DOCKER_PLATFORM` (e.g. `export BOUNTYBENCH_DOCKER_PLATFORM=linux/amd64`).
+
 #### Docker Mount Issue
 
 **Error Message:**
