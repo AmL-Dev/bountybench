@@ -137,7 +137,7 @@ class HelmMapping:
         "google/gemini-2.0-flash-thinking-exp-01-21": HelmModelInfo(
             tokenizer="google/gemma-2b"
         ),
-        "google/gemini-2.5-flash-preview-04-17": HelmModelInfo(
+        "google/gemini-2.5-flash": HelmModelInfo(
             tokenizer="google/gemma-2b"
         ),
         "google/gemini-2.5-pro-preview-03-25": HelmModelInfo(
@@ -253,8 +253,8 @@ class NonHelmMapping:
         "google/gemini-2.0-flash-001": NonHelmModelInfo(
             model_name="gemini-2.0-flash", provider=ServiceProvider.GOOGLE
         ),
-        "google/gemini-2.5-flash-preview-04-17": NonHelmModelInfo(
-            model_name="gemini-2.5-flash-preview-04-17", provider=ServiceProvider.GOOGLE
+        "google/gemini-2.5-flash": NonHelmModelInfo(
+            model_name="gemini-2.5-flash", provider=ServiceProvider.GOOGLE
         ),
         "google/gemini-2.5-pro-preview-03-25": NonHelmModelInfo(
             model_name="gemini-2.5-pro-preview-03-25", provider=ServiceProvider.GOOGLE

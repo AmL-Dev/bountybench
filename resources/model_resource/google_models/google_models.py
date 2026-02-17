@@ -7,13 +7,18 @@ from resources.model_resource.model_provider import ModelProvider
 from resources.model_resource.model_response import ModelResponse
 
 
+def _api_model_name(model: str) -> str:
+    """Return the model name expected by the Google API (e.g. gemini-2.5-flash)."""
+    return model.split("/")[-1] if "/" in model else model
+
+
 class GoogleModels(ModelProvider):
     def __init__(self):
         self.client = None  # We'll initialize this later with the specific model
 
     def create_client(self, model: str) -> gemini.GenerativeModel:
         gemini.configure(api_key=self._api_key())
-        return gemini.GenerativeModel(model)
+        return gemini.GenerativeModel(_api_model_name(model))
 
     def request(
         self,
@@ -23,7 +28,8 @@ class GoogleModels(ModelProvider):
         max_tokens: int,
         stop_sequences: List[str],
     ) -> ModelResponse:
-        if self.client is None or self.client.model_name != model:
+        api_model = _api_model_name(model)
+        if self.client is None or self.client.model_name != api_model:
             self.client = self.create_client(model)
 
         start_time = datetime.now()
@@ -84,6 +90,7 @@ class GoogleModels(ModelProvider):
         raise NotImplementedError("Decoding tokens is not supported for Gemini models")
 
     def get_num_tokens(self, model: str, message: str) -> int:
-        if self.client is None or self.client.model_name != model:
+        api_model = _api_model_name(model)
+        if self.client is None or self.client.model_name != api_model:
             self.client = self.create_client(model)
-        return self.client.count_tokens(input).total_tokens
+        return self.client.count_tokens(message).total_tokens
