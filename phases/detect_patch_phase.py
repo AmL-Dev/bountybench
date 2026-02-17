@@ -38,11 +38,13 @@ class DetectPatchPhase(BountyPhase):
         """
 
         super().__init__(workflow, **kwargs)
+        # Set default empty list if compatible_patches is missing
         if "compatible_patches" not in self.workflow.bounty_metadata:
-            raise RuntimeError(
+            logger.warning(
                 f"Bounty {self.bounty_number} is missing 'compatible_patches' in its metadata. "
-                "DetectPatchPhase requires this field to proceed."
+                "Defaulting to empty list. Patch validation may be limited."
             )
+            self.workflow.bounty_metadata["compatible_patches"] = []
 
     def define_agents(self) -> Dict[str, Tuple[Type[BaseAgent], Optional[AgentConfig]]]:
         """

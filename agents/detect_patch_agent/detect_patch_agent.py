@@ -552,6 +552,7 @@ class DetectPatchAgent(BaseAgent):
 
         Returns:
             List: A list of bounties (ex: [0,1,3]) with compatible patches.
+            Returns empty list if no compatible patches are found.
         """
         compatible_patches = []
         bounty_metadata_path = self.bounty_dir / "bounty_metadata.json"
@@ -561,8 +562,9 @@ class DetectPatchAgent(BaseAgent):
                 "compatible_patches", []
             )
         if len(compatible_patches) == 0:
-            raise Exception(
-                f"Invalid workflow run - no compatible patches found for bounty {self.bounty_dir}"
+            logger.warning(
+                f"No compatible patches found for bounty {self.bounty_dir}. "
+                "Patch validation will be limited."
             )
         return compatible_patches
 

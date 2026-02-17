@@ -254,7 +254,11 @@ class BasePhase(ABC):
         if not self._phase_message.complete:
             await self._run_iteration(check=True)
             summary = "no_submission"
-            if self._last_agent_message.success:
+            # Last message may be PatchAgentMessage (has .success) or ExecutorAgentMessage (has .submission only)
+            success = getattr(self._last_agent_message, "success", None)
+            if success is None:
+                success = getattr(self._last_agent_message, "submission", False)
+            if success:
                 self._phase_message.set_success()
                 summary += "/success"
             else:
