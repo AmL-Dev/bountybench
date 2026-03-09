@@ -56,6 +56,7 @@ class ExperimentRunner:
             self.config.get("vulnerability_type", [])
         )
         mock_model = self.config.get("use_mock_model", False)
+        max_output_tokens = self.config.get("max_output_tokens", None)
         # Prepare parameters for itertools.product
         params = [tasks, models, phase_iterations]
 
@@ -78,6 +79,7 @@ class ExperimentRunner:
                     mock_model,
                     iterations,
                     vuln_type,
+                    max_output_tokens,
                 )
                 commands.append((task_id, cmd))
                 task_id += 1
@@ -98,6 +100,7 @@ class ExperimentRunner:
         use_mock_model: bool,
         phase_iterations: int,
         vulnerability_type: Optional[str] = "",
+        max_output_tokens: Optional[int] = None,
     ) -> List[str]:
         """Build a command for the workflow runner"""
         cmd = [
@@ -122,6 +125,8 @@ class ExperimentRunner:
             cmd.append("--use_mock_model")
         if vulnerability_type and workflow_type.startswith("detect_"):
             cmd.extend(["--vulnerability_type", vulnerability_type])
+        if max_output_tokens is not None:
+            cmd.extend(["--max_output_tokens", str(max_output_tokens)])
 
         return cmd
 

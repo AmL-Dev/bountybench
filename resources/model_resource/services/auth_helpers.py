@@ -1,3 +1,4 @@
+import os
 from typing import Tuple
 
 import requests
@@ -88,6 +89,84 @@ def _auth_openai_api_key(
 
             if model_id not in valid_models:
                 error_msg = f"Model {model_name} not found.\n\nAvailable models from OpenAI: {valid_models}"
+                raise ValueError(error_msg)
+
+            return True, ""
+        except Exception as e:
+            return False, str(e)
+
+    return False, response.text
+
+
+def _auth_azure_openai_api_key(
+    api_key: str, model_name: str = None, verify_model: bool = False
+) -> Tuple[bool, str]:
+    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+    if not endpoint:
+        return False, "AZURE_OPENAI_ENDPOINT is not set."
+
+    # Use the same preview API version that works in the user's example.
+    url = f"{endpoint.rstrip('/')}/openai/deployments?api-version=2024-12-01-preview"
+    headers = {"api-key": api_key}
+    response = requests.get(url, headers=headers)
+
+    # If we clearly have an auth problem, surface it.
+    if response.status_code in (401, 403):
+        return False, response.text
+
+    # If the deployments endpoint is not available (e.g. 404) or returns some other
+    # non-2xx code, we can't reliably validate but the key may still be fine.
+    if response.status_code != 200:
+        return True, ""
+
+    # For 200 responses, optionally validate that the deployment exists.
+    try:
+        if not verify_model or model_name is None:
+            return True, ""
+
+        deployment_name = model_name.split("/")[-1]
+        valid_deployments = [
+            deployment["id"] for deployment in response.json().get("data", [])
+        ]
+        if deployment_name not in valid_deployments:
+            raise ValueError(
+                f"Deployment {model_name} not found.\n\nAvailable Azure deployments: {valid_deployments}"
+            )
+        return True, ""
+    except Exception as e:
+        # If anything goes wrong while inspecting deployments, don't block usage.
+        return True, str(e)
+
+
+def _auth_rchat_api_key(
+    api_key: str, model_name: str = None, verify_model: bool = False
+) -> Tuple[bool, str]:
+    """Authenticate against the NIST rchat OpenAI-compatible endpoint."""
+    url = "https://rchat.nist.gov/proxy/v1/models"
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        try:
+            if not verify_model or model_name is None:
+                return True, ""
+
+            model_id = model_name.split("/")[-1]
+            data = response.json()
+
+            if isinstance(data, dict) and "data" in data:
+                valid_models = [model.get("id") for model in data["data"] if "id" in model]
+            elif isinstance(data, list):
+                valid_models = [model.get("id") for model in data if isinstance(model, dict)]
+            else:
+                valid_models = []
+
+            if model_id not in valid_models:
+                error_msg = (
+                    f"Model {model_name} not found.\n\n"
+                    f"Available models from GPT-OSS: {valid_models}"
+                )
                 raise ValueError(error_msg)
 
             return True, ""

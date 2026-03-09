@@ -164,6 +164,18 @@ class ModelResource(RunnableBaseResource):
                 )
 
                 model_provider = OpenAIModels()
+            elif model_prefix == "azure":
+                from resources.model_resource.openai_models.azure_openai_models import (
+                    AzureOpenAIModels,
+                )
+
+                model_provider = AzureOpenAIModels()
+            elif model_prefix == "rchat":
+                from resources.model_resource.gpt_oss_models.gpt_oss_models import (
+                    RchatModels,
+                )
+
+                model_provider = RchatModels()
             elif model_prefix == "xai":
                 from resources.model_resource.xai_models.xai_models import XAIModels
 

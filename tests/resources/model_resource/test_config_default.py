@@ -85,6 +85,16 @@ def test_agent_lm_config(mock_env):
     assert lm_config5_copy.temperature == 0.7
     assert lm_config5_copy.use_helm is True
 
+    # Test with rchat model
+    lm_config6 = ModelResourceConfig(model="rchat/gpt-oss-120b", use_helm=False)
+    assert lm_config6.model == "rchat/gpt-oss-120b"
+    assert lm_config6.use_helm is False
+
+    # Test with Azure model
+    lm_config7 = ModelResourceConfig(model="azure/gpt-5-nano", use_helm=False)
+    assert lm_config7.model == "azure/gpt-5-nano"
+    assert lm_config7.use_helm is False
+
 
 def test_invalid_model_name(mock_env):
     with pytest.raises(ValueError, match="Model must be specified"):

@@ -18,7 +18,7 @@ TEMP_ENV_FILE.write(b"ANTHROPIC_API_KEY=sk-test-anthropic\n")
 TEMP_ENV_FILE.write(b"HELM_API_KEY=sk-test-helm\n")
 TEMP_ENV_FILE.close()
 ENV_PATH = Path(TEMP_ENV_FILE.name)
-MODEL_PROVIDERS = ["helm", "openai", "anthropic"]
+MODEL_PROVIDERS = ["helm", "openai", "anthropic", "rchat", "azure"]
 
 
 class TestApiKeyService(unittest.TestCase):

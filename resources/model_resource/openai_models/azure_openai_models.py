@@ -1,10 +1,13 @@
 import os
 from pathlib import Path
+from time import time
+from typing import List
 
 from dotenv import load_dotenv
 from openai import AzureOpenAI
 
 from resources.model_resource.openai_models.openai_models import OpenAIModels
+from resources.model_resource.model_response import ModelResponse
 
 
 class AzureOpenAIModels(OpenAIModels):
@@ -31,8 +34,58 @@ class AzureOpenAIModels(OpenAIModels):
         return endpoint
 
     def create_client(self) -> AzureOpenAI:
+        api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
         return AzureOpenAI(
             api_key=self._api_key(),
             azure_endpoint=self._endpoint(),
-            api_version="2024-06-01",
+            api_version=api_version,
         )
+
+    def request(
+        self,
+        model: str,
+        message: str,
+        temperature: float,
+        max_tokens: int,
+        stop_sequences: List[str],
+    ) -> ModelResponse:
+        """
+        Azure currently supports chat.completions for many deployments where
+        responses.create can return 404. Use chat.completions to match
+        the verified working integration.
+        """
+        status_code = None
+        model_name = model.split("/")[-1] if "/" in model else model
+
+        try:
+            response = self.client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": message}],
+                max_completion_tokens=max_tokens,
+                stop=stop_sequences if stop_sequences else None,
+            )
+
+            if hasattr(response, "response") and hasattr(
+                response.response, "status_code"
+            ):
+                status_code = response.response.status_code
+
+            content = response.choices[0].message.content or ""
+            return ModelResponse(
+                content=content,
+                input_tokens=response.usage.prompt_tokens,
+                output_tokens=response.usage.completion_tokens,
+                time_taken_in_ms=float(time()) - response.created,
+                status_code=status_code,
+            )
+        except Exception as e:
+            try:
+                if hasattr(e, "status_code"):
+                    status_code = e.status_code
+                elif hasattr(e, "response") and hasattr(e.response, "status_code"):
+                    status_code = e.response.status_code
+            except Exception:
+                pass
+            if status_code is not None:
+                e.status_code = status_code
+            raise

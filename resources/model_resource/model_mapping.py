@@ -225,6 +225,24 @@ class NonHelmMapping:
             model_name="gpt-4.1-2025-04-14", provider=ServiceProvider.OPENAI
         ),
         # ------------------------
+        # Azure OpenAI Models
+        # ------------------------
+        "azure/gpt-5.2-codex": NonHelmModelInfo(
+            model_name="gpt-5.2-codex", provider=ServiceProvider.AZURE_OPENAI
+        ),
+        "azure/gpt-5.1-codex": NonHelmModelInfo(
+            model_name="gpt-5.1-codex", provider=ServiceProvider.AZURE_OPENAI
+        ),
+        "azure/gpt-5.1-codex-mini": NonHelmModelInfo(
+            model_name="gpt-5.1-codex-mini", provider=ServiceProvider.AZURE_OPENAI
+        ),
+        "azure/gpt-5-mini": NonHelmModelInfo(
+            model_name="gpt-5-mini", provider=ServiceProvider.AZURE_OPENAI
+        ),
+        "azure/gpt-5-nano": NonHelmModelInfo(
+            model_name="gpt-5-nano", provider=ServiceProvider.AZURE_OPENAI
+        ),
+        # ------------------------
         # Anthropic Models (Claude)
         # ------------------------
         "anthropic/claude-3-7-sonnet-20250219": NonHelmModelInfo(
@@ -301,6 +319,13 @@ class NonHelmMapping:
             model_name="mistralai/Mixtral-8x22B-Instruct-v0.1",
             provider=ServiceProvider.TOGETHER,
             is_legacy=True,
+        ),
+        # ------------------------
+        # Rchat Models
+        # ------------------------
+        "rchat/gpt-oss-120b": NonHelmModelInfo(
+            model_name="gpt-oss-120b",
+            provider=ServiceProvider.RCHAT,
         ),
     }
 

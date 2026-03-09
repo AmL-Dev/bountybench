@@ -4,11 +4,13 @@ from typing import Callable
 
 from resources.model_resource.services.auth_helpers import (
     _auth_anthropic_api_key,
+    _auth_azure_openai_api_key,
     _auth_google_api_key,
     _auth_helm_api_key,
     _auth_openai_api_key,
     _auth_together_api_key,
     _auth_xai_api_key,
+    _auth_rchat_api_key,
 )
 
 
@@ -19,6 +21,8 @@ class ServiceProvider(Enum):
     TOGETHER = "together"
     XAI = "xai"
     HELM = "helm"
+    RCHAT = "rchat"
+    AZURE_OPENAI = "azure_openai"
 
 
 @dataclass(frozen=True)
@@ -39,6 +43,11 @@ PROVIDER_CONFIG: dict[ServiceProvider, ServiceProviderConfig] = {
         api_key_name="OPENAI_API_KEY",
         auth_function=_auth_openai_api_key,
     ),
+    ServiceProvider.AZURE_OPENAI: ServiceProviderConfig(
+        name="azure",
+        api_key_name="AZURE_OPENAI_API_KEY",
+        auth_function=_auth_azure_openai_api_key,
+    ),
     ServiceProvider.GOOGLE: ServiceProviderConfig(
         name="google",
         api_key_name="GOOGLE_API_KEY",
@@ -58,6 +67,11 @@ PROVIDER_CONFIG: dict[ServiceProvider, ServiceProviderConfig] = {
         name="helm",
         api_key_name="HELM_API_KEY",
         auth_function=_auth_helm_api_key,
+    ),
+    ServiceProvider.RCHAT: ServiceProviderConfig(
+        name="rchat",
+        api_key_name="RCHAT_API_KEY",
+        auth_function=_auth_rchat_api_key,
     ),
 }
 
